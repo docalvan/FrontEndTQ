@@ -1,0 +1,166 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<style>
+	table {
+	font-family: arial, sans-serif;
+	border-collapse: collapse;
+	width: 100%;
+	}
+
+	td, th {
+	border: 1px solid #dddddd;
+	text-align: left;
+	padding: 8px;
+	}
+
+	tr:nth-child(even) {
+	background-color: #dddddd;
+	}
+</style>
+
+<h1>Usuarios</h1>
+
+<br />
+
+<div>
+	<button class="btn btn-primary">Agregar</button>
+</div>
+
+<br />
+
+
+@if(result != null)
+{
+	<table>
+		<thead>
+			<tr>
+				<th>Id</th>
+				<th>Nombre</th>
+				<th>Correo</th>
+				<th>Clave</th>
+				<th>Editar</th>
+				<th>Eliminar</th>
+
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (clientSwagger.Usuario usuario in result)
+			{
+				<tr>
+					<th>@usuario.Id</th>
+					<th>@usuario.Nombre</th>
+					<th>@usuario.Correo</th>
+					<th>
+						<input type="@inputType2" value="@usuario.Clave" id="clave" class="form-control" disabled />
+					</th>
+					<th><button class="btn btn-warning" @onclick="()=> EditarUsuario(usuario.Id)">Editar</button></th>
+					<th><button class="btn btn-danger">Eliminar</button></th>
+				</tr>
+
+			}
+		</tbody>
+	</table>
+}
+
+<br />
+<br />
+
+<div style="@(mostrarFormulario ? "display: block;" : "display: none;")">
+	<form id="FormEdit">
+		<h2>Editar</h2>
+		<div>
+			<label>Id</label>
+			<input type="text" @bind="usuarioSelect.Id" disabled class="form-control" />
+		</div>
+		<div>
+			<label>Nombre</label>
+			<input type="text" @bind="usuarioSelect.Nombre" class="form-control" />
+		</div>
+		<div>
+			<label>Correo</label>
+			<input type="email" @bind="usuarioSelect.Correo" class="form-control" />
+		</div>
+		<div>
+			<label>Clave</label>
+			<input type="@inputType" @bind="usuarioSelect.Clave" class="form-control" />
+			<button type="button" @onclick="VerClave">Ver</button>
+		</div>
+		<div>
+			<button type="button" class="btn btn-success" @onclick="GuardarCambios">Guardar</button>
+			<button type="button" class="btn btn-secondary" @onclick="CancelarEdicion">Cancelar</button>
+		</div>
+	</form>
+</div>
+
+@inject HttpClient Http // Inyectando HttpClient
+@inject IJSRuntime JSRuntime
+
+@code {
+	private ICollection<clientSwagger.Usuario> result;
+	private clientSwagger.Usuario usuarioSelect = new clientSwagger.Usuario(); // Usuario en edición
+	private clientSwagger.clientSwagger client = new clientSwagger.clientSwagger("https://localhost:7084/", new HttpClient());
+
+	private bool mostrarFormulario = false;
+	private string inputType = "password";
+	private string inputType2 = "password";
+
+	private void VerClave()
+	{
+		inputType = (inputType == "password") ? "text" : "password";
+		StateHasChanged();
+	}
+
+	private async Task Refresh()
+	{
+		var usuario = await client.UsuariosAllAsync();
+		result = usuario.ToList();
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		await Refresh();
+	}	
+
+
+	//private clientSwagger.clientSwagger client = new clientSwagger.clientSwagger("https://localhost:7084/", new HttpClient());
+
+	private async Task EditarUsuario(int id)
+	{
+		mostrarFormulario = true;
+
+		// Realizar la llamada HTTP
+		var response = await Http.GetAsync($"https://localhost:7084/Usuarios/{id}");
+		if (response.IsSuccessStatusCode)
+		{
+			usuarioSelect = await response.Content.ReadAsAsync<clientSwagger.Usuario>();
+		}
+		else
+		{
+			// Manejo de error si no se obtiene el usuario
+			Console.WriteLine("Error al obtener el usuario");
+		}
+	}
+
+
+	private async Task GuardarCambios()
+	{
+		// Actualizar el usuario en el servidor
+		await client.UsuariosPUTAsync(usuarioSelect.Id, usuarioSelect);
+
+		// Refrescar la lista de usuarios
+		await Refresh();
+
+		mostrarFormulario = false;
+
+		await JSRuntime.InvokeVoidAsync("alert", "Usuario Actualizado correctamente.");
+	}
+
+	private void CancelarEdicion()
+	{
+		mostrarFormulario = false;
+		usuarioSelect = new clientSwagger.Usuario();
+	}
+
+}
